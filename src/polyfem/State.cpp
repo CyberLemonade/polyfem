@@ -1165,6 +1165,9 @@ namespace polyfem
 			Eigen::saveMarket(stiffness, full_mat_path);
 		}
 
+		Eigen::VectorXd c_sol;
+		init_solve(c_sol);
+
 		if (problem->is_time_dependent())
 		{
 			const double t0 = args["time"]["t0"];
@@ -1178,8 +1181,6 @@ namespace polyfem
 							  resolve_output_path(args["output"]["paraview"]["file_name"]));
 			}
 
-			Eigen::VectorXd c_sol;
-			init_transient(c_sol);
 			RhsAssembler &rhs_assembler = *(step_data.rhs_assembler);
 
 			if (formulation() == "NavierStokes")
@@ -1191,7 +1192,7 @@ namespace polyfem
 			else if (assembler.is_linear(formulation()) && !args["contact"]["enabled"]) // Collisions add nonlinearity to the problem
 				solve_transient_tensor_linear(time_steps, t0, dt, rhs_assembler);
 			else
-				solve_transient_tensor_non_linear(time_steps, t0, dt, rhs_assembler);
+				solve_transient_tensor_nonlinear(time_steps, t0, dt, rhs_assembler);
 		}
 		else
 		{
@@ -1200,7 +1201,13 @@ namespace polyfem
 			else if (assembler.is_linear(formulation()) && !args["contact"]["enabled"])
 				solve_linear();
 			else
-				solve_non_linear();
+			{
+				init_nonlinear_tensor_solve();
+				solve_tensor_nonlinear();
+				const std::string u_path = resolve_output_path(args["output"]["data"]["u_path"]);
+				if (!u_path.empty())
+					write_matrix(u_path, sol);
+			}
 		}
 
 		timer.stop();
